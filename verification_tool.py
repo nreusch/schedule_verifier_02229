@@ -379,7 +379,7 @@ class Testcase:
     def checkChains(self):
         print("3. Checking chains: ")
         costs = []
-        
+
         for chain in self.chains.values():
             first_task = self.tasks[chain.tasks[0].id]
             max_latency = -1
@@ -436,7 +436,9 @@ class Testcase:
 
 
 
-
-tc = Testcase(Path(sys.argv[1]))
+if len(sys.argv) > 1:
+    tc = Testcase(Path(sys.argv[1]))
+else:
+    print("No path argument")
 
 
