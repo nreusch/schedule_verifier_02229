@@ -7,6 +7,7 @@ import sys
 def lcm(denominators):
     return reduce(lambda x,y: (lambda a,b: next(i for i in range(max(a,b),a*b+1) if i%a==0 and i%b==0))(x,y), denominators)
 
+    
 class Task:
     def __init__(self, id, name, wcet, period, deadline, max_jitter, offset, cpu_id, core_id):
         self.id = id
@@ -111,7 +112,7 @@ class Core:
                         cur_slice = None
             
             if not int(self.hyperperiod/task_dict[task_id].period) == len(self.tasks[task_id].jobs):
-                raise ValueError("Error: Expected {} jobs for task {}, got {}".format(int(self.hyperperiod/task_dict[task_id]), task_id, len(self.tasks[task_id].jobs)))
+                raise ValueError("Error: Expected {} jobs for task {}, got {}".format(int(self.hyperperiod/task_dict[task_id].period), task_id, len(self.tasks[task_id].jobs)))
 
 @total_ordering
 class Slice:
@@ -302,7 +303,7 @@ class Testcase:
         return check
 
     def checkJobs(self):
-        print("--- checking tasks: deadlines, wcet, jitter, macrotick")
+        print("--- checking tasks: deadlines, wcet, jitter, macrotick, offset")
         all_valid = True
         for cpu in self.cpus.values():
             for core in cpu.cores.values():
@@ -317,15 +318,21 @@ class Testcase:
                     if not (initial_release_time != -1 and initial_finish_time != -1):
                         raise ValueError("Error: Job {} has invalid start or end time. (Is there any slice in job?)".format(job_list[0]))
 
+                    # check Offset
+                    if job_list[0].start < task.offset:
+                        print("Task {} starts before its specified offset {}".format(task.id, task.offset))
+                        all_valid = False
+
                     i = 0
-                    for job in job_list:
+                    for job in job_list:                       
                         # check WCET
                         if job.length < task.wcet:
                             print("Task {} has not enough slice time in interval [{},{}] ({}<{})".format(task.id, job.interval_begin, job.interval_end, job.length, task.wcet))
                             all_valid = False
                         
                         # check deadlines
-                        deadline_interval = (initial_release_time + i*task.period, initial_release_time + i*task.period + task.deadline)
+                        #deadline_interval = (initial_release_time + i*task.period, initial_release_time + i*task.period + task.deadline)
+                        deadline_interval = (task.offset + i*task.period, task.offset + i*task.period + task.deadline)
 
                         if i == len(job_list) - 1:
                             # For last job wrap interval to beginning
@@ -356,10 +363,10 @@ class Testcase:
                         if job.is_preempted:
                             task.is_preempted = True
                             for i in range(len(job.slices) - 1):
-                                # For each except last slice check divisable by macrotick
-                                if job.slices[i].duration % core.macrotick != 0:
+                                # For each except last slice check bigger or equal than macrotick
+                                if job.slices[i].duration < core.macrotick:
                                     all_valid = False
-                                    print("Task {} has a slice [{},{}] whose duration {} is not a multiple of the macrotick {}".format
+                                    print("Task {} has a slice [{},{}] whose duration {} is smaller than the macrotick {}".format
                                     (
                                         task.id, job.slices[i].start, job.slices[i].end, job.slices[i].duration, core.macrotick
                                     ))
@@ -432,7 +439,10 @@ class Testcase:
             else:
                 print("--- Chain {} is {}. Cost is {}".format(chain.name, "\033[91m" + "exceeding budget" + "\033[0m", cost))
         
-        print("\n--> Mean cost is {}".format(sum(costs)/len(costs)))
+        if len(costs) > 0:
+            print("\n--> Mean cost is {}".format(sum(costs)/len(costs)))
+        else:
+            print("No chains")
 
 
 
