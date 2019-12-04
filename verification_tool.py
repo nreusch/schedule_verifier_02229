@@ -167,7 +167,7 @@ class Job:
         s = "Job("
         for sl in self.slices:
             s = s + "[{},{}], ".format(sl.start, sl.end)
-        return s + "T {}, Start {}, End {}, Length {}, Preempted: {})".format(self.assoc_task_id, self.start, self.end, self.length, self.is_preempted)
+        return s + "T {}, Start {}, End {}, Interval [{}, {}], Length {}, Preempted: {})".format(self.assoc_task_id, self.start, self.end,self.interval_begin, self.interval_end, self.length, self.is_preempted)
     
     def addSlice(self, slice : Slice):
         assert slice.assoc_task_id == self.assoc_task_id
@@ -333,7 +333,11 @@ class Testcase:
                         # check deadlines
                         #deadline_interval = (initial_release_time + i*task.period, initial_release_time + i*task.period + task.deadline)
                         deadline_interval = (task.offset + i*task.period, task.offset + i*task.period + task.deadline)
-
+                        intersect = job.intersect_interval(deadline_interval[0], deadline_interval[1])
+                        if (intersect < task.wcet):
+                                print("Task {} has not enough slice time in deadline interval [{},{}] ({}<{})".format(task.id, deadline_interval[0], deadline_interval[1], intersect, task.wcet))
+                                all_valid = False
+                        '''
                         if i == len(job_list) - 1:
                             # For last job wrap interval to beginning
                             assert (i+1) % job_nr == 0
@@ -348,6 +352,7 @@ class Testcase:
                             if (intersect1 + intersect2 < task.wcet):
                                 print("Task {} has not enough slice time in deadline interval [{},{}] ({}<{})".format(task.id, deadline_interval[0], deadline_interval[1], intersect1+intersect2, task.wcet))
                                 all_valid = False
+                        '''
 
                         # check max jitter
                         start_jitter = abs(initial_release_time - (job.start - i*task.period))
@@ -362,13 +367,13 @@ class Testcase:
                         # check preemption & macrotick
                         if job.is_preempted:
                             task.is_preempted = True
-                            for i in range(len(job.slices) - 1):
+                            for j in range(len(job.slices) - 1):
                                 # For each except last slice check bigger or equal than macrotick
-                                if job.slices[i].duration < core.macrotick:
+                                if job.slices[j].duration < core.macrotick:
                                     all_valid = False
                                     print("Task {} has a slice [{},{}] whose duration {} is smaller than the macrotick {}".format
                                     (
-                                        task.id, job.slices[i].start, job.slices[i].end, job.slices[i].duration, core.macrotick
+                                        task.id, job.slices[j].start, job.slices[j].end, job.slices[j].duration, core.macrotick
                                     ))
                         # 
                         i = i + 1
